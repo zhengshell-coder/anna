@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="安娜">
+<meta name="theme-color" content="#4f46e5">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>安娜 · 俄语老师</title>
+<style>
+  :root{
+    --bg:#f6f6fa; --card:#ffffff; --ink:#1c1c28; --sub:#7a7a8c;
+    --accent:#4f46e5; --accent-soft:#eef0ff; --green:#16a34a; --red:#e11d48;
+    --ru:#0f3d91; --line:#ececf2; --radius:16px;
+    --sab:env(safe-area-inset-bottom,0px); --sat:env(safe-area-inset-top,0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%; margin:0; overscroll-behavior:none;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+    background:var(--bg); color:var(--ink); display:flex; flex-direction:column;
+    height:100dvh; padding-top:var(--sat);
+  }
+  button{font-family:inherit; border:none; background:none; cursor:pointer; color:inherit;}
+  input,textarea{font-family:inherit;}
+
+  /* ===== 头部 ===== */
+  header{
+    display:flex; align-items:center; gap:10px; padding:8px 14px;
+    background:var(--card); border-bottom:1px solid var(--line); flex:none;
+  }
+  .avatarWrap{position:relative; width:46px; height:46px; flex:none;}
+  .avatarWrap svg{width:100%; height:100%; display:block;}
+  .avatarWrap::after{
+    content:""; position:absolute; inset:-4px; border-radius:50%;
+    border:2px solid transparent; transition:border-color .3s;
+  }
+  .avatarWrap.speaking::after{border-color:var(--accent); animation:pulse 1.2s infinite;}
+  .avatarWrap.listening::after{border-color:var(--green); animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%{transform:scale(1);opacity:1}70%{transform:scale(1.18);opacity:.2}100%{transform:scale(1.18);opacity:0}}
+  .who{flex:1; min-width:0;}
+  .who .name{font-weight:600; font-size:16px;}
+  .who .status{font-size:12px; color:var(--sub); display:flex; align-items:center; gap:5px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:#c4c4cf;flex:none;}
+  .dot.on{background:var(--green);}
+  .iconBtn{font-size:20px; padding:8px; border-radius:12px; color:var(--sub);}
+  .iconBtn:active{background:var(--accent-soft);}
+
+  /* 嘴巴/眨眼动画 */
+  .avatarWrap.speaking #mouthOpen{animation:talk .35s infinite alternate;}
+  .avatarWrap.speaking #mouthSmile{opacity:0;}
+  #mouthOpen{opacity:0; transform-box:fill-box; transform-origin:center;}
+  @keyframes talk{from{opacity:1; transform:scaleY(.45)} to{opacity:1; transform:scaleY(1)}}
+  #lidL,#lidR{transform-box:fill-box; transform-origin:center; animation:blink 4.6s infinite;}
+  @keyframes blink{0%,94%,100%{transform:scaleY(0)} 96%,98%{transform:scaleY(1)}}
+
+  /* ===== 对话区 ===== */
+  #chat{flex:1; overflow-y:auto; padding:14px 14px 6px; -webkit-overflow-scrolling:touch;}
+  .msg{display:flex; margin-bottom:10px; animation:fadeUp .25s ease;}
+  @keyframes fadeUp{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+  .msg .bubble{
+    max-width:82%; padding:9px 13px; border-radius:var(--radius);
+    font-size:15px; line-height:1.55; white-space:pre-wrap; word-break:break-word;
+  }
+  .msg.anna .bubble{background:var(--card); border:1px solid var(--line); border-top-left-radius:6px;}
+  .msg.me{justify-content:flex-end;}
+  .msg.me .bubble{background:var(--accent); color:#fff; border-top-right-radius:6px;}
+  .msg.sys{justify-content:center;}
+  .msg.sys .bubble{background:none; color:var(--sub); font-size:12px; text-align:center;}
+  .ru{color:var(--ru); font-weight:600; text-decoration:underline dotted rgba(15,61,145,.45); text-underline-offset:3px;}
+  .msg.me .ru{color:#fff;}
+  .micTag{font-size:11px; opacity:.6; margin-right:4px;}
+
+  /* ===== 控制条 ===== */
+  #controls{
+    flex:none; display:flex; align-items:center; gap:8px;
+    padding:8px 12px; background:var(--card); border-top:1px solid var(--line);
+  }
+  #callBtn{
+    width:48px; height:48px; border-radius:50%; flex:none;
+    background:var(--accent); color:#fff; font-size:22px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 3px 10px rgba(79,70,229,.35); transition:background .25s, transform .15s;
+  }
+  #callBtn:active{transform:scale(.93);}
+  #callBtn.oncall{background:var(--red); box-shadow:0 3px 10px rgba(225,29,72,.35);}
+  #muteBtn{display:none; width:42px;height:42px;border-radius:50%;flex:none;background:var(--accent-soft);font-size:18px;}
+  #muteBtn.muted{background:#fde2e8;}
+  body.incall #muteBtn{display:flex;align-items:center;justify-content:center;}
+  #textIn{
+    flex:1; border:1px solid var(--line); background:var(--bg);
+    border-radius:22px; padding:10px 15px; font-size:16px; outline:none; min-width:0;
+  }
+  #sendBtn{flex:none; color:var(--accent); font-weight:600; font-size:15px; padding:8px 6px;}
+  #sendBtn:disabled{color:#b9b9c6;}
+  #meter{position:absolute; left:0; right:0; top:-3px; height:3px; display:none;}
+  body.incall #meter{display:block;}
+  #meterBar{height:100%; width:0%; background:var(--green); transition:width .12s; border-radius:3px;}
+
+  /* ===== 下半屏:学习面板 ===== */
+  #panel{
+    flex:none; height:42%; background:var(--card); border-top:1px solid var(--line);
+    display:flex; flex-direction:column; transition:height .25s ease;
+    border-radius:18px 18px 0 0; box-shadow:0 -4px 18px rgba(28,28,40,.05);
+    position:relative;
+  }
+  #panel.min{height:52px; overflow:hidden;}
+  #tabs{display:flex; flex:none; padding:6px 8px 0; gap:2px; align-items:center;}
+  .tab{
+    flex:1; text-align:center; font-size:13.5px; color:var(--sub);
+    padding:9px 0 10px; border-radius:12px 12px 0 0; position:relative; font-weight:500;
+  }
+  .tab.active{color:var(--accent); font-weight:700;}
+  .tab.active::after{content:""; position:absolute; left:25%; right:25%; bottom:4px; height:3px; border-radius:3px; background:var(--accent);}
+  .tab .badge{
+    position:absolute; top:3px; right:8px; min-width:16px; height:16px; border-radius:8px;
+    background:var(--red); color:#fff; font-size:10px; line-height:16px; padding:0 4px;
+    display:none;
+  }
+  #panelToggle{flex:none; font-size:15px; color:var(--sub); padding:8px 10px 8px 4px;}
+  #panelBody{flex:1; overflow-y:auto; padding:10px 14px calc(12px + var(--sab)); -webkit-overflow-scrolling:touch;}
+  .empty{color:var(--sub); font-size:13.5px; text-align:center; padding:26px 18px; line-height:1.7;}
+
+  .card{
+    background:var(--bg); border:1px solid var(--line); border-radius:14px;
+    padding:10px 13px; margin-bottom:9px; display:flex; align-items:center; gap:10px;
+  }
+  .card .main{flex:1; min-width:0;}
+  .card .ruWord{font-size:17px; font-weight:700; color:var(--ru);}
+  .card .ipa{font-size:12px; color:var(--sub); margin-left:6px;}
+  .card .zh{font-size:13px; color:var(--ink); margin-top:2px;}
+  .card .sub2{font-size:12px; color:var(--sub); margin-top:2px; line-height:1.5;}
+  .card .ops{display:flex; gap:2px; flex:none;}
+  .card .ops button{font-size:17px; padding:7px;}
+  .gCard .title{font-weight:700; font-size:14.5px;}
+  .gCard .explain{font-size:13px; color:var(--sub); margin-top:3px; line-height:1.6;}
+
+  .dayCard{background:var(--bg); border:1px solid var(--line); border-radius:14px; padding:11px 13px; margin-bottom:9px;}
+  .dayCard .dhead{display:flex; justify-content:space-between; align-items:center; font-weight:600; font-size:14px;}
+  .dayCard .dmeta{font-size:12px; color:var(--sub);}
+  .dayCard .dsum{font-size:13px; line-height:1.65; margin-top:6px; color:var(--ink);}
+  .dayCard .dwords{font-size:12.5px; color:var(--ru); margin-top:5px; line-height:1.6;}
+  .linkBtn{color:var(--accent); font-size:13px; font-weight:600; padding:4px 0;}
+
+  /* ===== 弹层 ===== */
+  .overlay{
+    position:fixed; inset:0; background:rgba(20,20,30,.45); z-index:50;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .overlay.show{display:flex;}
+  .sheet{
+    background:var(--card); width:100%; max-width:520px; border-radius:20px 20px 0 0;
+    padding:20px 20px calc(24px + var(--sab)); max-height:88dvh; overflow-y:auto;
+    animation:slideUp .25s ease;
+  }
+  @keyframes slideUp{from{transform:translateY(40px); opacity:.6} to{transform:none; opacity:1}}
+  .sheet h2{margin:0 0 4px; font-size:18px;}
+  .sheet .hint{font-size:13px; color:var(--sub); line-height:1.7; margin:6px 0 14px;}
+  .sheet label{font-size:13px; font-weight:600; display:block; margin:14px 0 6px;}
+  .sheet input[type=text],.sheet input[type=password],.sheet select{
+    width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:12px;
+    font-size:16px; background:var(--bg); outline:none;
+  }
+  .btnRow{display:flex; gap:10px; margin-top:18px;}
+  .btn{
+    flex:1; padding:13px; border-radius:13px; font-size:15px; font-weight:600;
+    background:var(--accent-soft); color:var(--accent); text-align:center;
+  }
+  .btn.primary{background:var(--accent); color:#fff;}
+  .btn.danger{background:#fde8ed; color:var(--red);}
+  .btn:active{opacity:.8;}
+  .kvs{font-size:12.5px; color:var(--sub); line-height:1.8; margin-top:14px;}
+
+  /* 词卡详情 */
+  #wordSheet .bigRu{font-size:30px; font-weight:800; color:var(--ru); text-align:center; margin:8px 0 2px;}
+  #wordSheet .bigIpa{text-align:center; color:var(--sub); font-size:14px;}
+  #wordSheet .bigZh{text-align:center; font-size:16px; margin:8px 0 4px;}
+  #wordSheet .pron{
+    background:var(--accent-soft); border-radius:13px; padding:11px 14px;
+    font-size:13.5px; line-height:1.7; margin-top:12px; color:#373766;
+  }
+  #wordSheet .ex{font-size:13.5px; color:var(--sub); margin-top:10px; line-height:1.6; text-align:center;}
+
+  /* 引导页 */
+  #onboard{align-items:center;}
+  #onboard .sheet{border-radius:22px; margin:0 16px calc(20px + var(--sab));}
+  .step{display:flex; gap:11px; margin:13px 0; font-size:14px; line-height:1.65;}
+  .step .n{
+    flex:none; width:24px; height:24px; border-radius:50%; background:var(--accent);
+    color:#fff; font-size:13px; font-weight:700; text-align:center; line-height:24px;
+  }
+  .step a{color:var(--accent); font-weight:600; word-break:break-all;}
+
+  /* toast */
+  #toast{
+    position:fixed; left:50%; transform:translateX(-50%); bottom:calc(30% + var(--sab));
+    background:rgba(28,28,40,.92); color:#fff; padding:10px 18px; border-radius:14px;
+    font-size:13.5px; z-index:99; display:none; max-width:82%; text-align:center; line-height:1.5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="avatarWrap" id="avatarWrap">
+    <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="cir"><circle cx="60" cy="60" r="58"/></clipPath>
+        <linearGradient id="bgg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#e8ecff"/><stop offset="1" stop-color="#d6dcff"/>
+        </linearGradient>
+      </defs>
+      <g clip-path="url(#cir)">
+        <rect width="120" height="120" fill="url(#bgg)"/>
+        <!-- 身体 -->
+        <path d="M22 122 Q24 88 60 88 Q96 88 98 122 Z" fill="#4f46e5"/>
+        <path d="M50 88 L60 100 L70 88 Q60 96 50 88Z" fill="#fff"/>
+        <!-- 脖子 -->
+        <rect x="52" y="74" width="16" height="16" rx="7" fill="#f3c6a5"/>
+        <!-- 头发后层 -->
+        <path d="M28 52 Q28 18 60 18 Q92 18 92 52 L92 74 Q86 80 82 74 L38 74 Q34 80 28 74 Z" fill="#6b4226"/>
+        <!-- 脸 -->
+        <ellipse cx="60" cy="54" rx="26" ry="27" fill="#fbd7b6"/>
+        <!-- 刘海 -->
+        <path d="M34 50 Q34 24 60 24 Q86 24 86 50 Q80 38 70 36 Q72 42 68 46 Q62 34 50 36 Q40 38 34 50Z" fill="#7a4d2b"/>
+        <!-- 眼睛 -->
+        <g>
+          <ellipse cx="49" cy="54" rx="4" ry="4.8" fill="#2d2a26"/>
+          <circle cx="50.5" cy="52.5" r="1.4" fill="#fff"/>
+          <rect id="lidL" x="44" y="48" width="10" height="11" rx="5" fill="#fbd7b6" transform="scale(1,0)"/>
+        </g>
+        <g>
+          <ellipse cx="71" cy="54" rx="4" ry="4.8" fill="#2d2a26"/>
+          <circle cx="72.5" cy="52.5" r="1.4" fill="#fff"/>
+          <rect id="lidR" x="66" y="48" width="10" height="11" rx="5" fill="#fbd7b6" transform="scale(1,0)"/>
+        </g>
+        <path d="M44 45 Q49 42 54 45" stroke="#6b4226" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <path d="M66 45 Q71 42 76 45" stroke="#6b4226" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- 腮红 -->
+        <ellipse cx="42" cy="63" rx="4.5" ry="2.6" fill="#f7b29a" opacity=".7"/>
+        <ellipse cx="78" cy="63" rx="4.5" ry="2.6" fill="#f7b29a" opacity=".7"/>
+        <!-- 嘴 -->
+        <path id="mouthSmile" d="M53 72 Q60 78 67 72" stroke="#c2543f" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+        <ellipse id="mouthOpen" cx="60" cy="74" rx="6" ry="4.6" fill="#b34a36"/>
+        <!-- 耳机 -->
+        <path d="M30 50 Q30 16 60 16 Q90 16 90 50" stroke="#34343f" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <rect x="26" y="48" width="8" height="14" rx="4" fill="#34343f"/>
+        <rect x="86" y="48" width="8" height="14" rx="4" fill="#34343f"/>
+        <path d="M88 62 Q88 76 72 78" stroke="#34343f" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <circle cx="70" cy="78.5" r="3.4" fill="#e11d48"/>
+      </g>
+      <circle cx="60" cy="60" r="58" fill="none" stroke="#dcdcf0" stroke-width="2"/>
+    </svg>
+  </div>
+  <div class="who">
+    <div class="name">安娜 Анна</div>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusTxt">你的俄语老师 · 随时在线</span></div>
+  </div>
+  <button class="iconBtn" id="settingsBtn" aria-label="设置">⚙️</button>
+</header>
+
+<div id="chat"></div>
+
+<div id="controls" style="position:relative">
+  <div id="meter"><div id="meterBar"></div></div>
+  <button id="callBtn" aria-label="语音通话">📞</button>
+  <button id="muteBtn" aria-label="静音">🎙️</button>
+  <input id="textIn" type="text" placeholder="打字聊也可以…" autocomplete="off">
+  <button id="sendBtn">发送</button>
+</div>
+
+<div id="panel">
+  <div id="tabs">
+    <button class="tab active" data-tab="vocab">本课词汇<span class="badge" id="vBadge"></span></button>
+    <button class="tab" data-tab="grammar">语法点<span class="badge" id="gBadge"></span></button>
+    <button class="tab" data-tab="book">生词本</button>
+    <button class="tab" data-tab="days">学习记录</button>
+    <button id="panelToggle" aria-label="收起">▾</button>
+  </div>
+  <div id="panelBody"></div>
+</div>
+
+<!-- 设置 -->
+<div class="overlay" id="settingsSheet">
+  <div class="sheet">
+    <h2>设置</h2>
+    <label>Gemini API Key</label>
+    <input type="password" id="keyIn" placeholder="粘贴你的 API Key">
+    <div class="hint" style="margin-top:6px">免费申请:用 Google 账号打开 <b>aistudio.google.com/apikey</b> → Create API key → 复制粘贴到上面。Key 只保存在你自己手机里。</div>
+    <label>安娜的声音</label>
+    <select id="voiceSel">
+      <option value="Kore">Kore(沉稳女声·推荐)</option>
+      <option value="Aoede">Aoede(轻快女声)</option>
+      <option value="Leda">Leda(年轻女声)</option>
+      <option value="Puck">Puck(活泼男声)</option>
+    </select>
+    <div class="btnRow">
+      <button class="btn" id="testBtn">测试连接</button>
+      <button class="btn primary" id="saveSetBtn">保存</button>
+    </div>
+    <div class="btnRow">
+      <button class="btn" id="exportBtn">导出学习数据</button>
+      <button class="btn" id="importBtn">导入数据</button>
+    </div>
+    <div class="btnRow">
+      <button class="btn danger" id="wipeBtn">清空全部数据</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json" style="display:none">
+    <div class="kvs" id="usageInfo"></div>
+  </div>
+</div>
+
+<!-- 词卡详情 -->
+<div class="overlay" id="wordSheet">
+  <div class="sheet">
+    <div class="bigRu" id="wRu"></div>
+    <div class="bigIpa" id="wIpa"></div>
+    <div class="bigZh" id="wZh"></div>
+    <div class="pron" id="wPron"></div>
+    <div class="ex" id="wEx"></div>
+    <div class="btnRow">
+      <button class="btn" id="wSlow">🔊 慢速</button>
+      <button class="btn" id="wNorm">🔊 常速</button>
+      <button class="btn primary" id="wStar">⭐ 收藏</button>
+    </div>
+  </div>
+</div>
+
+<!-- 首次引导 -->
+<div class="overlay" id="onboard">
+  <div class="sheet">
+    <h2>跟安娜学俄语 🇷🇺</h2>
+    <div class="hint">安娜是一位孜孜不倦的 AI 俄语老师:随时语音聊天、纠正发音、记住你的进度。开始前只需一步——给她接上"大脑"(免费):</div>
+    <div class="step"><div class="n">1</div><div>用 Google 账号打开<br><a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></div></div>
+    <div class="step"><div class="n">2</div><div>点 <b>「Create API key」</b>,复制生成的 Key(免费,不用绑卡)</div></div>
+    <div class="step"><div class="n">3</div><div>粘贴到下面,开始上课 👇</div></div>
+    <input type="password" id="obKey" placeholder="粘贴 API Key" style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:15px;background:var(--bg)">
+    <div class="btnRow"><button class="btn primary" id="obGo">保存,开始学习</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   安娜 · 俄语老师  —  单文件 PWA
+   语音:Gemini Live API(WebSocket 直连,原生音频)
+   文字/提取/小结:Gemini generateContent REST
+   存储:localStorage(可导出/导入)
+============================================================ */
+
+/* ---------- 工具 ---------- */
+const $ = s => document.querySelector(s);
+const todayStr = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const normRu = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^а-яё-]/g,"");
+const cyrCount = s => (s.match(/[А-Яа-яЁё]/g)||[]).length;
+let toastTimer;
+function toast(msg, ms=2600){ const t=$("#toast"); t.textContent=msg; t.style.display="block"; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.display="none", ms); }
+
+/* ---------- 存储 ---------- */
+const DEFAULTS = {
+  v:1, apiKey:"", voice:"Kore",
+  liveModel:"gemini-3.1-flash-live-preview",
+  wsVariant:0,                 // 记住可用的协议变体
+  seeded:false,
+  wordbook:[],                 // {ru,ipa,zh,pron,example,addedAt}
+  grammarbook:[],              // {title,explain,addedAt}
+  days:{},                     // date -> {turns:[{who,text,ts}], cards:{words:[],grammar:[]}, summary:null}
+  usage:{},                    // date -> {live:n, rest:n}
+  profileNotes:[]              // 历史小结沉淀的薄弱点等
+};
+let store;
+try{ store = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem("anna_ru")||"{}")); }
+catch(e){ store = Object.assign({}, DEFAULTS); }
+function save(){ try{ localStorage.setItem("anna_ru", JSON.stringify(store)); }catch(e){ console.warn("save fail", e); } }
+function day(d=todayStr()){
+  if(!store.days[d]) store.days[d] = {turns:[], cards:{words:[],grammar:[]}, summary:null};
+  if(!store.days[d].cards) store.days[d].cards = {words:[],grammar:[]};
+  return store.days[d];
+}
+function bumpUsage(kind){ const d=todayStr(); if(!store.usage[d]) store.usage[d]={live:0,rest:0}; store.usage[d][kind]++; save(); }
+
+/* ---------- 模型链(404/429 时自动换下一个) ---------- */
+const TEXT_CHAIN = ["gemini-3.5-flash","gemini-3.1-flash-lite","gemini-2.5-flash","gemini-2.5-flash-lite"];
+const UTIL_CHAIN = ["gemini-3.1-flash-lite","gemini-2.5-flash-lite","gemini-2.5-flash","gemini-3.5-flash"];
+
+async function restCall(chain, body){
+  let lastErr = null;
+  for(const m of chain){
+    try{
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(store.apiKey)}`,{
+        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)
+      });
+      if(r.status===404 || r.status===400){ lastErr = new Error("model:"+m+":"+r.status); continue; }
+      if(r.status===429){ lastErr = Object.assign(new Error("quota"),{quota:true}); continue; }
+      if(r.status===403 || r.status===401){ throw Object.assign(new Error("key"),{badKey:true}); }
+      if(!r.ok){ lastErr = new Error("http "+r.status); continue; }
+      bumpUsage("rest");
+      const j = await r.json();
+      const txt = j?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("") || "";
+      if(!txt) { lastErr = new Error("empty"); continue; }
+      return txt;
+    }catch(e){
+      if(e.badKey) throw e;
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("rest failed");
+}
+
+/* ---------- 老师人设(系统提示词) ---------- */
+function profileText(){
+  const days = Object.keys(store.days).sort();
+  const turnsTotal = days.reduce((n,d)=>n+(store.days[d].turns||[]).length,0);
+  const wb = store.wordbook;
+  const lines = [];
+  lines.push(`今天日期:${todayStr()}。`);
+  if(days.length<=1 && turnsTotal<4){
+    lines.push("这是他最初几次上课。他自报认识约50个基础俄语单词(简单问候、常见名词),语法几乎为零。先聊轻松话题摸底,从打招呼、自我介绍这类最实用的内容开始。");
+  }else{
+    lines.push(`已学习 ${days.length} 天,累计对话 ${turnsTotal} 回合。生词本里有 ${wb.length} 个词。`);
+  }
+  if(wb.length){
+    const sample = wb.slice(-40).map(w=>w.ru).join("、");
+    lines.push(`他收藏过的词(可在对话中自然复现帮他复习):${sample}`);
+  }
+  const sums = days.map(d=>store.days[d].summary).filter(Boolean).slice(-3);
+  if(sums.length){
+    lines.push("最近几次学习小结:");
+    sums.forEach(s=>{ lines.push(`- ${s.summary||""}${s.weak_points&&s.weak_points.length?(" 薄弱点:"+s.weak_points.join("、")):""}`); });
+    const nf = sums[sums.length-1].next_focus;
+    if(nf) lines.push(`上次建议本次聚焦:${nf}`);
+  }
+  return lines.join("\n");
+}
+
+function systemPrompt(mode){
+  return `你是安娜(Анна),28岁,来自莫斯科,一位温柔、风趣、极有耐心、孜孜不倦的俄语老师。你正在陪你的中国学生"大哥"练俄语。你的中文非常流利。
+
+【学生档案】
+${profileText()}
+
+【教学方式 — 严格遵守】
+1. 以中文为主交流,俄语内容少量多次地自然带入。学生是纯初学者,一次只教一个俄语词或一个超短句,绝不说大段俄语。
+2. 教新词时:先正常语速说一遍,再放慢逐音节说一遍,然后用中文点出发音要点:重音在哪个音节、中国人容易错的音、用什么汉语近似音找感觉(例:р 是大舌颤音,先用"得儿~"找震动;ы 介于"诶"和"乌"之间,嘴角向两边拉)。
+3. 听到学生说俄语:先简短肯定,再温柔指出发音或用词问题,示范正确说法,请他再说一遍。
+4. 经常把他学过的词自然编进新话题里复习(间隔重复),装作顺口一提。
+5. 像朋友闲聊:从他的生活、兴趣、今天发生的事切入,把俄语融进真实话题,不要课堂腔。
+6. 每回合要短:中文不超过三句 + 俄语最多一个短句,结尾抛一个简单问题让他开口。
+7. 他说听不懂、卡住或沉默时,立刻放慢、简化、改用中文解释。
+8. 鼓励要真诚但克制,像真人,不要每句都夸。
+9. 开场简短热情(可带一句 Привет),自然衔接上次内容或问他今天怎么样,不要冗长开场白。` +
+(mode==="voice"
+ ? "\n10. 你们正在语音通话:说话口语化、亲切、简短。说俄语时吐字清晰、放慢。"
+ : "\n10. 现在是文字聊天:新俄语词请按「俄语单词 — 中文意思 — 发音要点」一行写清,重音用重音符号标出(如 приве́т),其余规则不变。");
+}
+
+/* ---------- 音频输出(24kHz PCM 流式播放) ---------- */
+let actx = null;
+function ensureCtx(){
+  if(!actx){ const AC = window.AudioContext||window.webkitAudioContext; actx = new AC(); }
+  if(actx.state==="suspended") actx.resume();
+  return actx;
+}
+const audioOut = {
+  nextT:0, active:new Set(), speaking:false,
+  play(b64){
+    const ctx = ensureCtx();
+    const bin = atob(b64); const n = bin.length>>1;
+    if(!n) return;
+    const f = new Float32Array(n);
+    for(let i=0;i<n;i++){ let v = bin.charCodeAt(2*i) | (bin.charCodeAt(2*i+1)<<8); if(v>=0x8000) v-=0x10000; f[i]=v/32768; }
+    const buf = ctx.createBuffer(1, n, 24000);
+    buf.copyToChannel(f, 0);
+    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
+    const t = Math.max(ctx.currentTime + 0.06, this.nextT);
+    src.start(t); this.nextT = t + buf.duration;
+    this.active.add(src);
+    src.onended = () => { this.active.delete(src); if(!this.active.size) this.setSpeaking(false); };
+    this.setSpeaking(true);
+  },
+  flush(){ for(const s of this.active){ try{s.stop();}catch(e){} } this.active.clear(); this.nextT=0; this.setSpeaking(false); },
+  setSpeaking(v){ if(this.speaking!==v){ this.speaking=v; ui.annaSpeaking(v); } }
+};
+
+/* ---------- 音频输入(麦克风 → 16kHz PCM) ---------- */
+function downsampleTo16k(f32, fromRate){
+  const ratio = fromRate/16000;
+  const outLen = Math.floor(f32.length/ratio);
+  const out = new Int16Array(outLen);
+  let rms = 0;
+  for(let i=0;i<outLen;i++){
+    const v = Math.max(-1, Math.min(1, f32[Math.floor(i*ratio)]||0));
+    out[i] = v<0 ? v*0x8000 : v*0x7FFF;
+    rms += v*v;
+  }
+  return {pcm:out, level: outLen?Math.sqrt(rms/outLen):0};
+}
+function b64FromInt16(int16){
+  const u8 = new Uint8Array(int16.buffer, int16.byteOffset, int16.byteLength);
+  let s=""; const CH=0x8000;
+  for(let i=0;i<u8.length;i+=CH) s += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i+CH,u8.length)));
+  return btoa(s);
+}
+const WORKLET_SRC = `
+class PCMCap extends AudioWorkletProcessor{
+  constructor(){ super(); this.bufs=[]; this.len=0; this.target=Math.round(sampleRate*0.25); }
+  process(inputs){
+    const ch = inputs[0] && inputs[0][0];
+    if(ch){ this.bufs.push(new Float32Array(ch)); this.len+=ch.length;
+      if(this.len>=this.target){
+        const all=new Float32Array(this.len); let o=0;
+        for(const b of this.bufs){ all.set(b,o); o+=b.length; }
+        this.bufs=[]; this.len=0;
+        this.port.postMessage({samples:all, rate:sampleRate}, [all.buffer]);
+      } }
+    return true;
+  }
+}
+registerProcessor('pcm-cap', PCMCap);`;
+
+const audioIn = {
+  stream:null, node:null, srcNode:null, muted:false, onChunk:null, onLevel:null,
+  async start(){
+    const ctx = ensureCtx();
+    this.stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
+    this.srcNode = ctx.createMediaStreamSource(this.stream);
+    const handle = (f32, rate) => {
+      if(this.muted) return;
+      const {pcm, level} = downsampleTo16k(f32, rate);
+      if(this.onLevel) this.onLevel(level);
+      if(this.onChunk && pcm.length) this.onChunk(b64FromInt16(pcm));
+    };
+    let workletOK = false;
+    if(ctx.audioWorklet){
+      try{
+        const url = URL.createObjectURL(new Blob([WORKLET_SRC],{type:"application/javascript"}));
+        await ctx.audioWorklet.addModule(url);
+        this.node = new AudioWorkletNode(ctx, "pcm-cap");
+        this.node.port.onmessage = e => handle(e.data.samples, e.data.rate);
+        this.srcNode.connect(this.node);
+        workletOK = true;
+      }catch(e){ console.warn("worklet失败,退回ScriptProcessor", e); }
+    }
+    if(!workletOK){
+      const sp = ctx.createScriptProcessor(4096,1,1);
+      let acc=[], accLen=0; const target=Math.round(ctx.sampleRate*0.25);
+      sp.onaudioprocess = ev => {
+        const d = ev.inputBuffer.getChannelData(0);
+        acc.push(new Float32Array(d)); accLen+=d.length;
+        if(accLen>=target){
+          const all=new Float32Array(accLen); let o=0;
+          for(const b of acc){ all.set(b,o); o+=b.length; }
+          acc=[]; accLen=0; handle(all, ctx.sampleRate);
+        }
+      };
+      this.srcNode.connect(sp); sp.connect(ctx.destination); // Safari 需要连到目的地才会触发
+      this.node = sp;
+    }
+  },
+  stop(){
+    try{ if(this.node) this.node.disconnect(); }catch(e){}
+    try{ if(this.srcNode) this.srcNode.disconnect(); }catch(e){}
+    if(this.stream){ this.stream.getTracks().forEach(t=>t.stop()); }
+    this.stream=null; this.node=null; this.srcNode=null; this.muted=false;
+  }
+};
+
+/* ---------- Gemini Live(WebSocket) ---------- */
+const WS_URL = key => `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${encodeURIComponent(key)}`;
+
+function buildSetupVariants(model, voice, sys){
+  const core = {
+    model:`models/${model}`,
+    systemInstruction:{parts:[{text:sys}]},
+    inputAudioTranscription:{}, outputAudioTranscription:{},
+    contextWindowCompression:{slidingWindow:{}}
+  };
+  const speech = {voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}};
+  return [
+    // 0: 2026 文档格式
+    {config: Object.assign({}, core, {responseModalities:["AUDIO"], speechConfig:speech})},
+    // 1: 旧版 setup 格式
+    {setup: Object.assign({}, core, {generationConfig:{responseModalities:["AUDIO"], speechConfig:speech}})},
+    // 2/3: 去掉压缩配置的精简版
+    {config:{model:core.model, systemInstruction:core.systemInstruction, responseModalities:["AUDIO"], speechConfig:speech, inputAudioTranscription:{}, outputAudioTranscription:{}}},
+    {setup:{model:core.model, systemInstruction:core.systemInstruction, generationConfig:{responseModalities:["AUDIO"], speechConfig:speech}, inputAudioTranscription:{}, outputAudioTranscription:{}}}
+  ];
+}
+
+class LiveClient{
+  constructor(opts){ Object.assign(this, opts); this.ws=null; this.ready=false; this.closedByUser=false; this.variant=store.wsVariant||0; this.attempts=0; }
+  connect(){
+    this.ws = new WebSocket(WS_URL(store.apiKey));
+    this.openedAt = Date.now();
+    this.ws.onopen = () => {
+      const variants = buildSetupVariants(store.liveModel, store.voice, this.sys);
+      this.ws.send(JSON.stringify(variants[this.variant % variants.length]));
+    };
+    this.ws.onmessage = async ev => {
+      let data = ev.data;
+      if(data instanceof Blob) data = await data.text();
+      let msg; try{ msg = JSON.parse(data); }catch(e){ return; }
+      this.handle(msg);
+    };
+    this.ws.onerror = () => {};
+    this.ws.onclose = ev => {
+      const quick = !this.ready;
+      if(quick && !this.closedByUser && this.attempts < 3){
+        // 协议变体不被接受 → 换下一种再试
+        this.attempts++; this.variant = (this.variant+1)%4;
+        setTimeout(()=>this.connect(), 250);
+        return;
+      }
+      if(this.ready) store.wsVariant = this.variant, save();
+      this.onClose && this.onClose(ev, this.closedByUser);
+    };
+  }
+  handle(msg){
+    if(msg.setupComplete !== undefined){
+      this.ready = true; store.wsVariant = this.variant; save();
+      bumpUsage("live");
+      this.onReady && this.onReady();
+      return;
+    }
+    const sc = msg.serverContent;
+    if(sc){
+      if(sc.modelTurn && sc.modelTurn.parts){
+        for(const p of sc.modelTurn.parts){
+          if(p.inlineData && p.inlineData.data) this.onAudio && this.onAudio(p.inlineData.data);
+        }
+      }
+      if(sc.inputTranscription && sc.inputTranscription.text) this.onInTrans && this.onInTrans(sc.inputTranscription.text);
+      if(sc.outputTranscription && sc.outputTranscription.text) this.onOutTrans && this.onOutTrans(sc.outputTranscription.text);
+      if(sc.interrupted) this.onInterrupted && this.onInterrupted();
+      if(sc.turnComplete) this.onTurnComplete && this.onTurnComplete();
+    }
+    if(msg.goAway) this.onGoAway && this.onGoAway(msg.goAway);
+  }
+  sendAudio(b64){ if(this.ready && this.ws && this.ws.readyState===1) this.ws.send(JSON.stringify({realtimeInput:{audio:{data:b64, mimeType:"audio/pcm;rate=16000"}}})); }
+  sendText(t){ if(this.ready && this.ws && this.ws.readyState===1) this.ws.send(JSON.stringify({realtimeInput:{text:t}})); }
+  audioStreamEnd(){ if(this.ready && this.ws && this.ws.readyState===1) this.ws.send(JSON.stringify({realtimeInput:{audioStreamEnd:true}})); }
+  close(){ this.closedByUser = true; try{ this.ws && this.ws.close(); }catch(e){} }
+}
+
+/* ---------- 通话状态机 ---------- */
+const call = {
+  live:null, active:false, reconnects:0, wakeLock:null, phase:"idle",
+  userBuf:"", annaBuf:"", userEl:null, annaEl:null,
+
+  async start(){
+    if(!store.apiKey){ ui.showOnboard(); return; }
+    ensureCtx();
+    ui.setStatus("连接中…", false);
+    try{ await audioIn.start(); }
+    catch(e){ toast("需要麦克风权限才能语音聊天:请在弹窗里点允许(或到 设置→Safari→麦克风 打开)"); ui.setStatus("你的俄语老师 · 随时在线", false); return; }
+    this.active = true; this.reconnects = 0;
+    document.body.classList.add("incall");
+    $("#callBtn").classList.add("oncall"); $("#callBtn").textContent = "✕";
+    this.connectLive(false);
+    try{ const p = navigator.wakeLock && navigator.wakeLock.request("screen"); if(p) p.then(wl=>this.wakeLock=wl).catch(()=>{}); }catch(e){}
+  },
+
+  connectLive(isReconnect){
+    const lc = new LiveClient({ sys: systemPrompt("voice") });
+    this.live = lc;
+    lc.onReady = () => {
+      ui.setStatus("通话中 · 开口说话吧", true);
+      audioIn.onChunk = b64 => lc.sendAudio(b64);
+      audioIn.onLevel = lv => ui.meter(lv);
+      if(isReconnect) lc.sendText("(系统提示:刚才通话短暂断线又接上了,请自然接着刚才的话题继续,不要重新打招呼。)");
+      else if(!day().turns.length) lc.sendText("(系统提示:学生刚接通电话,请你先简短开场。)");
+      else lc.sendText("(系统提示:学生重新接通了电话,简短打个招呼接着学。)");
+    };
+    lc.onAudio = b64 => { audioOut.play(b64); };
+    lc.onInTrans = t => {
+      if(this.phase==="anna") this.finalizeAnna();
+      this.phase = "user"; this.userBuf += t;
+      if(!this.userEl) this.userEl = ui.addMsg("me", "", true);
+      ui.updateMsg(this.userEl, this.userBuf);
+      ui.setStatus("正在听你说…", true, "listening");
+    };
+    lc.onOutTrans = t => {
+      if(this.phase==="user") this.finalizeUser();
+      this.phase = "anna"; this.annaBuf += t;
+      if(!this.annaEl) this.annaEl = ui.addMsg("anna", "", true);
+      ui.updateMsg(this.annaEl, this.annaBuf);
+    };
+    lc.onInterrupted = () => { audioOut.flush(); this.finalizeAnna(); };
+    lc.onTurnComplete = () => { this.finalizeUser(); this.finalizeAnna(); this.phase="idle"; ui.setStatus("通话中 · 开口说话吧", true); };
+    lc.onGoAway = () => { /* 服务器即将断开:预约重连 */ this.scheduleReconnect(); };
+    lc.onClose = (ev, byUser) => {
+      if(byUser || !this.active) return;
+      if(!lc.ready){
+        this.hangup(true);
+        const reason = (ev && (ev.reason||"")) + "";
+        if(/quota|exhaust|429/i.test(reason)) toast("今天的语音免费额度可能用完了 😅 可以打字继续聊,或明天再来");
+        else if(/api key|permission|403|401/i.test(reason)) toast("API Key 无效或没权限,去设置里检查一下");
+        else toast("连接不上语音服务,检查网络或稍后再试。打字聊天仍然可用");
+        return;
+      }
+      this.scheduleReconnect();
+    };
+    lc.connect();
+  },
+
+  scheduleReconnect(){
+    if(!this.active) return;
+    if(this.reconnects >= 3){ this.hangup(true); toast("通话断开了,稍后再试或打字继续"); return; }
+    this.reconnects++;
+    ui.setStatus("重新连接中…", false);
+    try{ this.live && this.live.close(); }catch(e){}
+    setTimeout(()=>{ if(this.active) this.connectLive(true); }, 600);
+  },
+
+  finalizeUser(){
+    if(this.userBuf.trim()){
+      day().turns.push({who:"me", text:this.userBuf.trim(), ts:Date.now()});
+      extractor.feed("学生:" + this.userBuf.trim());
+      save();
+    }
+    this.userBuf=""; if(this.userEl) ui.solidify(this.userEl); this.userEl=null;
+  },
+  finalizeAnna(){
+    if(this.annaBuf.trim()){
+      day().turns.push({who:"anna", text:this.annaBuf.trim(), ts:Date.now()});
+      extractor.feed("老师:" + this.annaBuf.trim());
+      save();
+    }
+    this.annaBuf=""; if(this.annaEl) ui.solidify(this.annaEl); this.annaEl=null;
+  },
+
+  hangup(silent){
+    this.active = false;
+    this.finalizeUser(); this.finalizeAnna();
+    try{ this.live && this.live.close(); }catch(e){}
+    this.live = null;
+    audioIn.stop(); audioOut.flush();
+    try{ this.wakeLock && this.wakeLock.release(); }catch(e){}
+    this.wakeLock = null;
+    document.body.classList.remove("incall");
+    $("#callBtn").classList.remove("oncall"); $("#callBtn").textContent = "📞";
+    $("#muteBtn").classList.remove("muted"); $("#muteBtn").textContent="🎙️";
+    ui.setStatus("你的俄语老师 · 随时在线", false);
+    ui.meter(0);
+    if(!silent) ui.addMsg("sys", "通话结束");
+    extractor.flushNow();
+  }
+};
+
+/* ---------- 词汇/语法提取 ---------- */
+const extractor = {
+  pending:[], timer:null, busy:false,
+  feed(line){ this.pending.push(line); clearTimeout(this.timer); this.timer = setTimeout(()=>this.run(), 2500); },
+  flushNow(){ clearTimeout(this.timer); this.run(); },
+  async run(){
+    if(this.busy){ this.timer = setTimeout(()=>this.run(), 2000); return; }
+    const chunk = this.pending.join("\n");
+    if(cyrCount(chunk) < 4){ this.pending=[]; return; }
+    this.pending = [];
+    this.busy = true;
+    try{
+      const schema = {
+        type:"OBJECT",
+        properties:{
+          words:{type:"ARRAY", items:{type:"OBJECT", properties:{
+            ru:{type:"STRING"}, ipa:{type:"STRING"}, zh:{type:"STRING"},
+            pron:{type:"STRING"}, example:{type:"STRING"}
+          }, required:["ru","zh"]}},
+          grammar:{type:"ARRAY", items:{type:"OBJECT", properties:{
+            title:{type:"STRING"}, explain:{type:"STRING"}
+          }, required:["title","explain"]}}
+        },
+        required:["words","grammar"]
+      };
+      const txt = await restCall(UTIL_CHAIN, {
+        systemInstruction:{parts:[{text:"你是俄语教学助手。从师生对话片段中提取值得初学者记住的俄语词汇和语法点。只提取片段中实际出现的俄语;没有就返回空数组。ru字段:俄语原词,重音用组合重音符号标在重音元音后(如 приве́т);ipa:国际音标;zh:中文意思;pron:用中文讲发音要点+近似谐音,简洁实用;example:超短例句(可省)。grammar:对话中提到的语法现象,explain 用中文一两句解释。"}]},
+        contents:[{role:"user", parts:[{text:"对话片段:\n"+chunk}]}],
+        generationConfig:{responseMimeType:"application/json", responseSchema:schema, temperature:0.2}
+      });
+      const j = JSON.parse(txt);
+      const d = day();
+      let nv=0, ng=0;
+      (j.words||[]).forEach(w=>{
+        if(!w.ru || cyrCount(w.ru)===0) return;
+        const k = normRu(w.ru);
+        if(!k) return;
+        if(d.cards.words.some(x=>normRu(x.ru)===k)) return;
+        d.cards.words.push(w); nv++;
+      });
+      (j.grammar||[]).forEach(g=>{
+        if(!g.title) return;
+        if(d.cards.grammar.some(x=>x.title===g.title)) return;
+        d.cards.grammar.push(g); ng++;
+      });
+      if(nv||ng){ save(); ui.renderPanel(); if(nv) ui.bumpBadge("vBadge",nv); if(ng) ui.bumpBadge("gBadge",ng); }
+    }catch(e){ console.warn("提取失败", e); }
+    this.busy = false;
+  }
+};
+
+/* ---------- 文字聊天(REST) ---------- */
+const textChat = {
+  waiting:false,
+  async send(text){
+    if(this.waiting) return;
+    ui.addMsg("me", text);
+    day().turns.push({who:"me", text, ts:Date.now()}); save();
+    extractor.feed("学生:"+text);
+    if(call.active && call.live && call.live.ready){ call.live.sendText(text); return; }
+    if(!store.apiKey){ ui.showOnboard(); return; }
+    this.waiting = true; $("#sendBtn").disabled = true;
+    const tip = ui.addMsg("anna","…", true);
+    try{
+      const turns = day().turns.slice(-24);
+      const contents = turns.map(t=>({role: t.who==="me"?"user":"model", parts:[{text:t.text}]}));
+      const reply = await restCall(TEXT_CHAIN, {
+        systemInstruction:{parts:[{text: systemPrompt("text")}]},
+        contents,
+        generationConfig:{temperature:0.85}
+      });
+      ui.updateMsg(tip, reply); ui.solidify(tip);
+      day().turns.push({who:"anna", text:reply, ts:Date.now()}); save();
+      extractor.feed("老师:"+reply);
+    }catch(e){
+      tip.remove();
+      if(e.badKey) toast("API Key 无效,去设置里检查一下");
+      else if(e.quota) toast("今天的免费额度用完啦,明天会自动恢复 😊");
+      else toast("发送失败,检查一下网络");
+    }
+    this.waiting = false; $("#sendBtn").disabled = false;
+  }
+};
+
+/* ---------- 每日小结 ---------- */
+async function makeSummary(dateStr, silent){
+  const d = store.days[dateStr];
+  if(!d || !d.turns.length) return;
+  try{
+    const schema = {type:"OBJECT", properties:{
+      summary:{type:"STRING"}, new_words:{type:"ARRAY", items:{type:"STRING"}},
+      weak_points:{type:"ARRAY", items:{type:"STRING"}}, next_focus:{type:"STRING"}
+    }, required:["summary","new_words","weak_points","next_focus"]};
+    const transcript = d.turns.map(t=>(t.who==="me"?"学生:":"老师:")+t.text).join("\n").slice(-9000);
+    const txt = await restCall(UTIL_CHAIN, {
+      systemInstruction:{parts:[{text:"你是俄语学习记录助手。根据当天师生对话,生成中文学习小结。summary:2-4句,聊了什么+学了什么;new_words:当天接触的俄语词(带重音符号);weak_points:学生表现出的薄弱点;next_focus:下次建议聚焦的一句话。"}]},
+      contents:[{role:"user", parts:[{text:`日期:${dateStr}\n对话记录:\n${transcript}`}]}],
+      generationConfig:{responseMimeType:"application/json", responseSchema:schema, temperature:0.3}
+    });
+    d.summary = JSON.parse(txt); save(); ui.renderPanel();
+    if(!silent) toast("今日小结已生成 ✓");
+  }catch(e){ if(!silent) toast("小结生成失败,稍后再试"); }
+}
+
+/* ---------- 俄语朗读(本地 TTS,点词即读) ---------- */
+let ruVoice = null;
+function pickRuVoice(){
+  const vs = speechSynthesis.getVoices();
+  ruVoice = vs.find(v=>/^ru/i.test(v.lang) && /milena/i.test(v.name)) || vs.find(v=>/^ru/i.test(v.lang)) || null;
+}
+if("speechSynthesis" in window){ pickRuVoice(); speechSynthesis.onvoiceschanged = pickRuVoice; }
+function speakRu(text, rate=0.85){
+  if(!("speechSynthesis" in window)) return;
+  const clean = text.normalize("NFD").replace(/[̀-ͯ]/g,"");
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = "ru-RU"; if(ruVoice) u.voice = ruVoice; u.rate = rate;
+  speechSynthesis.speak(u);
+}
+
+/* ---------- UI ---------- */
+const ui = {
+  curTab:"vocab",
+
+  addMsg(who, text, live){
+    const chat = $("#chat");
+    const m = document.createElement("div"); m.className = "msg "+who;
+    const b = document.createElement("div"); b.className = "bubble";
+    if(who==="me" && call.active) b.innerHTML = '<span class="micTag">🎙</span>';
+    m.appendChild(b); chat.appendChild(m);
+    this.updateMsg(m, text);
+    if(live) m.dataset.live = "1";
+    chat.scrollTop = chat.scrollHeight;
+    return m;
+  },
+  updateMsg(m, text){
+    const b = m.querySelector(".bubble");
+    const tag = b.querySelector(".micTag") ? '<span class="micTag">🎙</span>' : "";
+    b.innerHTML = tag + this.ruLinkify(text);
+    const chat = $("#chat");
+    if(chat.scrollHeight - chat.scrollTop - chat.clientHeight < 220) chat.scrollTop = chat.scrollHeight;
+  },
+  solidify(m){ delete m.dataset.live; },
+  ruLinkify(text){
+    return esc(text).replace(/[Ѐ-ӿ][Ѐ-ӿ́̀-]*/g, w => `<span class="ru" data-ru="${esc(w)}">${w}</span>`);
+  },
+
+  setStatus(txt, on, mode){
+    $("#statusTxt").textContent = txt;
+    $("#statusDot").classList.toggle("on", !!on);
+    const w = $("#avatarWrap");
+    w.classList.toggle("listening", mode==="listening" && !audioOut.speaking);
+  },
+  annaSpeaking(v){
+    $("#avatarWrap").classList.toggle("speaking", v);
+    if(v){ $("#avatarWrap").classList.remove("listening"); if(call.active) this.setStatus("安娜说话中…", true); }
+  },
+  meter(lv){ $("#meterBar").style.width = Math.min(100, Math.round(lv*260)) + "%"; },
+
+  bumpBadge(id, n){
+    const el = $("#"+id);
+    const cur = parseInt(el.textContent||"0")||0;
+    el.textContent = cur+n; el.style.display = "block";
+  },
+
+  renderPanel(){
+    const body = $("#panelBody");
+    const d = day();
+    if(this.curTab==="vocab"){
+      $("#vBadge").style.display="none"; $("#vBadge").textContent="";
+      if(!d.cards.words.length){ body.innerHTML = `<div class="empty">还没有词汇。<br>跟安娜聊起来,讨论到的俄语词会自动出现在这里 ✨</div>`; return; }
+      body.innerHTML = d.cards.words.slice().reverse().map((w,i)=>{
+        const idx = d.cards.words.length-1-i;
+        const starred = store.wordbook.some(x=>normRu(x.ru)===normRu(w.ru));
+        return `<div class="card" data-w="${idx}">
+          <div class="main">
+            <span class="ruWord">${esc(w.ru)}</span><span class="ipa">${esc(w.ipa||"")}</span>
+            <div class="zh">${esc(w.zh||"")}</div>
+            ${w.pron?`<div class="sub2">💡 ${esc(w.pron)}</div>`:""}
+          </div>
+          <div class="ops">
+            <button data-act="say">🔊</button>
+            <button data-act="star">${starred?"⭐":"☆"}</button>
+          </div>
+        </div>`;
+      }).join("");
+    }
+    else if(this.curTab==="grammar"){
+      $("#gBadge").style.display="none"; $("#gBadge").textContent="";
+      if(!d.cards.grammar.length){ body.innerHTML = `<div class="empty">还没有语法点。<br>对话中讲到的语法会自动总结到这里 📖</div>`; return; }
+      body.innerHTML = d.cards.grammar.slice().reverse().map((g,i)=>{
+        const idx = d.cards.grammar.length-1-i;
+        const starred = store.grammarbook.some(x=>x.title===g.title);
+        return `<div class="card gCard" data-g="${idx}">
+          <div class="main"><div class="title">${esc(g.title)}</div><div class="explain">${this.ruLinkify(g.explain||"")}</div></div>
+          <div class="ops"><button data-act="gstar">${starred?"⭐":"☆"}</button></div>
+        </div>`;
+      }).join("");
+    }
+    else if(this.curTab==="book"){
+      const wb = store.wordbook, gb = store.grammarbook;
+      if(!wb.length && !gb.length){ body.innerHTML = `<div class="empty">生词本是空的。<br>点词卡上的 ☆ 把词收进来,安娜以后会帮你复习 ⭐</div>`; return; }
+      let h = "";
+      if(wb.length){
+        h += `<div style="font-size:12px;color:var(--sub);margin:2px 0 8px">收藏的词(${wb.length})· 安娜会在聊天里帮你复习</div>`;
+        h += wb.slice().reverse().map((w,i)=>{
+          const idx = wb.length-1-i;
+          return `<div class="card" data-b="${idx}">
+            <div class="main">
+              <span class="ruWord">${esc(w.ru)}</span><span class="ipa">${esc(w.ipa||"")}</span>
+              <div class="zh">${esc(w.zh||"")}</div>
+            </div>
+            <div class="ops"><button data-act="say">🔊</button><button data-act="del">🗑</button></div>
+          </div>`;
+        }).join("");
+      }
+      if(gb.length){
+        h += `<div style="font-size:12px;color:var(--sub);margin:12px 0 8px">收藏的语法(${gb.length})</div>`;
+        h += gb.slice().reverse().map((g,i)=>{
+          const idx = gb.length-1-i;
+          return `<div class="card gCard" data-bg="${idx}">
+            <div class="main"><div class="title">${esc(g.title)}</div><div class="explain">${this.ruLinkify(g.explain||"")}</div></div>
+            <div class="ops"><button data-act="gdel">🗑</button></div>
+          </div>`;
+        }).join("");
+      }
+      body.innerHTML = h;
+    }
+    else if(this.curTab==="days"){
+      const dates = Object.keys(store.days).sort().reverse();
+      const list = dates.filter(dt=>store.days[dt].turns.length);
+      if(!list.length){ body.innerHTML = `<div class="empty">还没有学习记录。<br>每天聊过的内容和小结都会存在这里 📅</div>`; return; }
+      body.innerHTML = list.map(dt=>{
+        const dd = store.days[dt];
+        const s = dd.summary;
+        return `<div class="dayCard">
+          <div class="dhead"><span>${dt==todayStr()?dt+"(今天)":dt}</span><span class="dmeta">${dd.turns.length} 回合 · ${dd.cards.words.length} 词</span></div>
+          ${s?`<div class="dsum">${esc(s.summary||"")}</div>${s.new_words&&s.new_words.length?`<div class="dwords">${s.new_words.map(esc).join(" · ")}</div>`:""}${s.next_focus?`<div class="dmeta" style="margin-top:5px">下次:${esc(s.next_focus)}</div>`:""}`
+           :`<button class="linkBtn" data-sum="${dt}">✍️ 生成今日小结</button>`}
+        </div>`;
+      }).join("");
+    }
+  },
+
+  openWord(w, fromBook){
+    $("#wRu").textContent = w.ru; $("#wIpa").textContent = w.ipa||"";
+    $("#wZh").textContent = w.zh||"";
+    $("#wPron").style.display = w.pron?"block":"none";
+    $("#wPron").textContent = w.pron?("💡 发音要点:"+w.pron):"";
+    $("#wEx").textContent = w.example?("例:"+w.example):"";
+    const starred = store.wordbook.some(x=>normRu(x.ru)===normRu(w.ru));
+    $("#wStar").textContent = starred ? "✓ 已收藏" : "⭐ 收藏";
+    $("#wStar").onclick = () => {
+      const i = store.wordbook.findIndex(x=>normRu(x.ru)===normRu(w.ru));
+      if(i>=0){ store.wordbook.splice(i,1); $("#wStar").textContent="⭐ 收藏"; }
+      else{ store.wordbook.push(Object.assign({addedAt:Date.now()}, w)); $("#wStar").textContent="✓ 已收藏"; toast("已收藏,安娜会帮你复习这个词"); }
+      save(); this.renderPanel();
+    };
+    $("#wSlow").onclick = () => speakRu(w.ru, 0.55);
+    $("#wNorm").onclick = () => speakRu(w.ru, 0.95);
+    $("#wordSheet").classList.add("show");
+  },
+
+  showOnboard(){ $("#onboard").classList.add("show"); },
+
+  refreshUsage(){
+    const u = store.usage[todayStr()]||{live:0,rest:0};
+    $("#usageInfo").innerHTML = `今日用量:语音通话 ${u.live} 次 · AI 请求 ${u.rest} 次<br>额度按 Google 免费档计算,每天太平洋时间 0 点重置。数据全部存在本机,建议偶尔「导出学习数据」备份。`;
+  }
+};
+
+/* ---------- 事件绑定 ---------- */
+$("#callBtn").addEventListener("click", () => { if(call.active) call.hangup(); else call.start(); });
+$("#muteBtn").addEventListener("click", () => {
+  audioIn.muted = !audioIn.muted;
+  $("#muteBtn").classList.toggle("muted", audioIn.muted);
+  $("#muteBtn").textContent = audioIn.muted ? "🔇" : "🎙️";
+  if(audioIn.muted && call.live) call.live.audioStreamEnd();
+  toast(audioIn.muted ? "麦克风已静音" : "麦克风已打开", 1200);
+});
+$("#sendBtn").addEventListener("click", sendText);
+$("#textIn").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); sendText(); } });
+function sendText(){
+  const v = $("#textIn").value.trim();
+  if(!v) return;
+  $("#textIn").value = "";
+  textChat.send(v);
+}
+
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  ui.curTab = t.dataset.tab;
+  $("#panel").classList.remove("min");
+  $("#panelToggle").textContent = "▾";
+  ui.renderPanel();
+}));
+$("#panelToggle").addEventListener("click", () => {
+  const p = $("#panel");
+  p.classList.toggle("min");
+  $("#panelToggle").textContent = p.classList.contains("min") ? "▴" : "▾";
+});
+
+/* 面板内的点按(词卡/语法/记录) */
+$("#panelBody").addEventListener("click", e => {
+  const btn = e.target.closest("button");
+  const card = e.target.closest(".card");
+  if(btn && btn.dataset.sum){ btn.textContent="生成中…"; makeSummary(btn.dataset.sum); return; }
+  const d = day();
+  if(card){
+    const act = btn && btn.dataset.act;
+    if(card.dataset.w !== undefined){
+      const w = d.cards.words[+card.dataset.w]; if(!w) return;
+      if(act==="say"){ speakRu(w.ru); return; }
+      if(act==="star"){
+        const i = store.wordbook.findIndex(x=>normRu(x.ru)===normRu(w.ru));
+        if(i>=0) store.wordbook.splice(i,1); else { store.wordbook.push(Object.assign({addedAt:Date.now()}, w)); toast("已收藏 ⭐"); }
+        save(); ui.renderPanel(); return;
+      }
+      ui.openWord(w);
+    }
+    else if(card.dataset.g !== undefined){
+      const g = d.cards.grammar[+card.dataset.g]; if(!g) return;
+      if(act==="gstar"){
+        const i = store.grammarbook.findIndex(x=>x.title===g.title);
+        if(i>=0) store.grammarbook.splice(i,1); else { store.grammarbook.push(Object.assign({addedAt:Date.now()}, g)); toast("已收藏 ⭐"); }
+        save(); ui.renderPanel(); return;
+      }
+    }
+    else if(card.dataset.b !== undefined){
+      const w = store.wordbook[+card.dataset.b]; if(!w) return;
+      if(act==="say"){ speakRu(w.ru); return; }
+      if(act==="del"){ store.wordbook.splice(+card.dataset.b,1); save(); ui.renderPanel(); return; }
+      ui.openWord(w, true);
+    }
+    else if(card.dataset.bg !== undefined){
+      if(act==="gdel"){ store.grammarbook.splice(+card.dataset.bg,1); save(); ui.renderPanel(); return; }
+    }
+  }
+});
+
+/* 聊天气泡里点俄语词 → 朗读 + 轻提示 */
+$("#chat").addEventListener("click", e => {
+  const ru = e.target.closest(".ru");
+  if(ru){ speakRu(ru.dataset.ru); }
+});
+
+/* 弹层开关 */
+$("#settingsBtn").addEventListener("click", () => {
+  $("#keyIn").value = store.apiKey;
+  $("#voiceSel").value = store.voice;
+  ui.refreshUsage();
+  $("#settingsSheet").classList.add("show");
+});
+document.querySelectorAll(".overlay").forEach(o => o.addEventListener("click", e => { if(e.target===o) o.classList.remove("show"); }));
+$("#saveSetBtn").addEventListener("click", () => {
+  store.apiKey = $("#keyIn").value.trim();
+  store.voice = $("#voiceSel").value;
+  save();
+  $("#settingsSheet").classList.remove("show");
+  toast("已保存 ✓");
+});
+$("#testBtn").addEventListener("click", async () => {
+  const k = $("#keyIn").value.trim();
+  if(!k){ toast("先粘贴 API Key"); return; }
+  $("#testBtn").textContent = "测试中…";
+  try{
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k)}&pageSize=1`);
+    toast(r.ok ? "连接成功 ✓ Key 可用" : "Key 无效(HTTP "+r.status+")");
+  }catch(e){ toast("网络不通,稍后再试"); }
+  $("#testBtn").textContent = "测试连接";
+});
+$("#obGo").addEventListener("click", () => {
+  const k = $("#obKey").value.trim();
+  if(!k){ toast("先按上面步骤拿到 Key 再粘贴哦"); return; }
+  store.apiKey = k; save();
+  $("#onboard").classList.remove("show");
+  toast("准备好了!点 📞 开始跟安娜聊天");
+});
+
+/* 导出 / 导入 / 清空 */
+$("#exportBtn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(store, null, 1)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "安娜俄语学习数据-"+todayStr()+".json";
+  a.click();
+});
+$("#importBtn").addEventListener("click", () => $("#importFile").click());
+$("#importFile").addEventListener("change", e => {
+  const f = e.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try{
+      const j = JSON.parse(rd.result);
+      if(!j.days) throw new Error("bad");
+      store = Object.assign({}, DEFAULTS, j); save();
+      ui.renderPanel(); toast("导入成功 ✓");
+    }catch(err){ toast("文件格式不对"); }
+  };
+  rd.readAsText(f);
+});
+$("#wipeBtn").addEventListener("click", () => {
+  if(confirm("确定清空全部学习数据?(API Key 也会清除)")){
+    localStorage.removeItem("anna_ru"); location.reload();
+  }
+});
+
+/* 页面恢复时:若通话中连接已断,自动重连 */
+document.addEventListener("visibilitychange", () => {
+  if(document.visibilityState==="visible" && call.active){
+    if(!call.live || !call.live.ws || call.live.ws.readyState>1) call.scheduleReconnect();
+    try{ const p = navigator.wakeLock && navigator.wakeLock.request("screen"); if(p) p.then(wl=>call.wakeLock=wl).catch(()=>{}); }catch(e){}
+  }
+});
+
+/* ---------- 启动 ---------- */
+(function init(){
+  // 恢复今天已有的对话
+  const d = day();
+  d.turns.slice(-40).forEach(t => { const m = ui.addMsg(t.who==="me"?"me":"anna", t.text); m.querySelector(".micTag")?.remove(); });
+
+  if(!store.seeded && !d.turns.length){
+    store.seeded = true;
+    const hello = "Приве́т!你好呀,我是安娜 👋 你的专属俄语老师,随时都在。\n\n点左下角 📞 就能跟我语音聊天(像打电话一样,可以随时打断我);打字聊也行。对话里出现的俄语词,点一下就能听发音,下面的面板会自动帮你整理词汇和语法。\n\n我们从最简单的开始,好吗?";
+    ui.addMsg("anna", hello);
+    d.turns.push({who:"anna", text:hello, ts:Date.now()});
+    save();
+  }
+  ui.renderPanel();
+
+  if(!store.apiKey) ui.showOnboard();
+
+  // 昨天的对话如果没小结,安静地补一份
+  if(store.apiKey){
+    const dates = Object.keys(store.days).sort();
+    const prev = dates.filter(x=>x<todayStr()).pop();
+    if(prev && store.days[prev].turns.length>=4 && !store.days[prev].summary) makeSummary(prev, true);
+  }
+
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
