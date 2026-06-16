@@ -165,7 +165,16 @@
     width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:12px;
     font-size:16px; background:var(--bg); outline:none;
   }
-  .btnRow{display:flex; gap:10px; margin-top:18px;}
+  .sheet input[type=range]{width:100%; accent-color:var(--accent); height:26px;}
+  .rangeRow{display:flex; align-items:center; gap:10px; margin-top:2px;}
+  .fieldHint{font-size:12px; color:var(--sub); margin-top:5px; line-height:1.6;}
+  .checkRow{display:flex; align-items:flex-start; gap:10px; margin-top:16px;}
+  .checkRow input{width:21px; height:21px; margin:1px 0 0; accent-color:var(--accent); flex:none;}
+  .checkRow label{margin:0; font-weight:600;}
+  .checkRow .sub{font-size:12px; color:var(--sub); margin-top:3px; font-weight:400;}
+  #testStat{font-size:14px; font-weight:600; align-self:center;}
+  #testStat.ok{color:var(--green);} #testStat.bad{color:var(--red);}
+  .btnRow{display:flex; gap:10px; margin-top:18px; align-items:center;}
   .btn{
     flex:1; padding:13px; border-radius:13px; font-size:15px; font-weight:600;
     background:var(--accent-soft); color:var(--accent); text-align:center;
@@ -291,15 +300,55 @@
     <label>Gemini API Key</label>
     <input type="password" id="keyIn" placeholder="粘贴你的 API Key">
     <div class="hint" style="margin-top:6px">免费申请:用 Google 账号打开 <b>aistudio.google.com/apikey</b> → Create API key → 复制粘贴到上面。Key 只保存在你自己手机里。</div>
-    <label>安娜的声音</label>
+
+    <label>对话模型</label>
+    <select id="modelSel">
+      <option value="auto">自动(推荐 · 失败时自动切换)</option>
+      <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite(额度最多)</option>
+      <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite(额度多)</option>
+      <option value="gemini-3.5-flash">gemini-3.5-flash(更聪明)</option>
+      <option value="gemini-2.5-flash">gemini-2.5-flash(稳定)</option>
+    </select>
+    <input type="text" id="customModelIn" placeholder="自定义模型名(选填,如 gemini-4-flash)" style="margin-top:8px">
+    <div class="fieldHint">额度紧张就选「额度最多」那档;填了自定义模型名会优先用它。语音通话固定走 Live 模型,不受这里影响。</div>
+
+    <label>安娜的声音(语音通话)</label>
     <select id="voiceSel">
       <option value="Kore">Kore(沉稳女声·推荐)</option>
       <option value="Aoede">Aoede(轻快女声)</option>
       <option value="Leda">Leda(年轻女声)</option>
       <option value="Puck">Puck(活泼男声)</option>
     </select>
+
+    <label>我的俄语水平</label>
+    <select id="levelSel">
+      <option value="A0">A0 纯入门(零基础)</option>
+      <option value="A1">A1 初级(认识基础问候)</option>
+      <option value="A2">A2 基础(能简单日常对话)</option>
+      <option value="B1">B1 中级(能聊熟悉话题)</option>
+      <option value="C1">C1 高级(接近流利)</option>
+    </select>
+    <div class="fieldHint">安娜会按这个水平调整难度。进步了就往上调一档。</div>
+
+    <label>感兴趣的话题</label>
+    <input type="text" id="topicsIn" placeholder="旅行、美食、科技、电影…">
+    <div class="fieldHint">安娜聊天时会优先围绕这些话题,把俄语融进你关心的内容。</div>
+
+    <label>点词朗读语速 <span id="rateVal" style="color:var(--accent);font-weight:700">0.9</span></label>
+    <div class="rangeRow"><input type="range" id="rateIn" min="0.5" max="1.2" step="0.05" value="0.9"></div>
+
+    <div class="checkRow">
+      <input type="checkbox" id="autoSpeakChk">
+      <label for="autoSpeakChk">文字聊天自动朗读
+        <div class="sub">打字聊天时,自动读出安娜回复里的俄语词</div>
+      </label>
+    </div>
+
     <div class="btnRow">
       <button class="btn" id="testBtn">测试连接</button>
+      <span id="testStat"></span>
+    </div>
+    <div class="btnRow">
       <button class="btn primary" id="saveSetBtn">保存</button>
     </div>
     <div class="btnRow">
@@ -368,6 +417,12 @@ const DEFAULTS = {
   v:1, apiKey:"", voice:"Kore",
   liveModel:"gemini-3.1-flash-live-preview",
   wsVariant:0,                 // 记住可用的协议变体
+  level:"A0",                  // 俄语水平 A0/A1/A2/B1/C1
+  topics:"",                   // 感兴趣的话题(逗号分隔的自由文本)
+  speechRate:0.9,              // 点词朗读语速 0.5~1.2
+  autoSpeakText:false,         // 文字聊天时安娜回复自动朗读其中的俄语
+  textModel:"auto",            // 首选文本模型;"auto"=用内置链自动切换
+  customModel:"",              // 自定义模型名,优先级最高
   seeded:false,
   wordbook:[],                 // {ru,ipa,zh,pron,example,addedAt}
   grammarbook:[],              // {title,explain,addedAt}
@@ -389,6 +444,13 @@ function bumpUsage(kind){ const d=todayStr(); if(!store.usage[d]) store.usage[d]
 /* ---------- 模型链(404/429 时自动换下一个) ---------- */
 const TEXT_CHAIN = ["gemini-3.5-flash","gemini-3.1-flash-lite","gemini-2.5-flash","gemini-2.5-flash-lite"];
 const UTIL_CHAIN = ["gemini-3.1-flash-lite","gemini-2.5-flash-lite","gemini-2.5-flash","gemini-3.5-flash"];
+
+// 把用户选的首选模型(自定义优先)放到链首,其余作为自动回退
+function effectiveChain(base){
+  const pick = (store.customModel||"").trim() || (store.textModel && store.textModel!=="auto" ? store.textModel : "");
+  if(!pick) return base;
+  return [pick, ...base.filter(m=>m!==pick)];
+}
 
 async function restCall(chain, body){
   let lastErr = null;
@@ -415,14 +477,26 @@ async function restCall(chain, body){
 }
 
 /* ---------- 老师人设(系统提示词) ---------- */
+function levelDesc(){
+  return ({
+    A0:"纯零基础。一次只教一个词或一个超短句,绝不说大段俄语,绝大部分用中文。",
+    A1:"初级,认识基础问候和几十个常用词。可用最简单的俄语短句,仍以中文为主、循序渐进。",
+    A2:"基础,能进行简单日常对话。可适当多用俄语短句,逐步引入基础语法。",
+    B1:"中级,能就熟悉话题交流。多用俄语对话,中文只在关键处解释,纠正更细致。",
+    C1:"高级,接近流利。尽量全程用俄语,只在他卡住时用中文,挑战更地道的表达。"
+  })[store.level] || "纯零基础。一次只教一个词或一个超短句。";
+}
 function profileText(){
   const days = Object.keys(store.days).sort();
   const turnsTotal = days.reduce((n,d)=>n+(store.days[d].turns||[]).length,0);
   const wb = store.wordbook;
   const lines = [];
   lines.push(`今天日期:${todayStr()}。`);
+  lines.push(`他的俄语水平:${store.level||"A0"}。${levelDesc()}`);
+  const topics = (store.topics||"").trim();
+  if(topics) lines.push(`他感兴趣的话题:${topics}。尽量围绕这些话题展开,把俄语自然融进去。`);
   if(days.length<=1 && turnsTotal<4){
-    lines.push("这是他最初几次上课。他自报认识约50个基础俄语单词(简单问候、常见名词),语法几乎为零。先聊轻松话题摸底,从打招呼、自我介绍这类最实用的内容开始。");
+    lines.push("这是他最初几次上课。先聊轻松话题摸底,从打招呼、自我介绍这类最实用的内容开始。");
   }else{
     lines.push(`已学习 ${days.length} 天,累计对话 ${turnsTotal} 回合。生词本里有 ${wb.length} 个词。`);
   }
@@ -447,7 +521,7 @@ function systemPrompt(mode){
 ${profileText()}
 
 【教学方式 — 严格遵守】
-1. 以中文为主交流,俄语内容少量多次地自然带入。学生是纯初学者,一次只教一个俄语词或一个超短句,绝不说大段俄语。
+1. 严格按【学生档案】里标注的俄语水平调整难度和俄语比例:水平越低越以中文为主、俄语越少越慢;水平越高越多用俄语。永远不要超出他的水平说大段俄语。
 2. 教新词时:先正常语速说一遍,再放慢逐音节说一遍,然后用中文点出发音要点:重音在哪个音节、中国人容易错的音、用什么汉语近似音找感觉(例:р 是大舌颤音,先用"得儿~"找震动;ы 介于"诶"和"乌"之间,嘴角向两边拉)。
 3. 听到学生说俄语:先简短肯定,再温柔指出发音或用词问题,示范正确说法,请他再说一遍。
 4. 经常把他学过的词自然编进新话题里复习(间隔重复),装作顺口一提。
@@ -779,7 +853,7 @@ const extractor = {
         },
         required:["words","grammar"]
       };
-      const txt = await restCall(UTIL_CHAIN, {
+      const txt = await restCall(effectiveChain(UTIL_CHAIN), {
         systemInstruction:{parts:[{text:"你是俄语教学助手。从师生对话片段中提取值得初学者记住的俄语词汇和语法点。只提取片段中实际出现的俄语;没有就返回空数组。ru字段:俄语原词,重音用组合重音符号标在重音元音后(如 приве́т);ipa:国际音标;zh:中文意思;pron:用中文讲发音要点+近似谐音,简洁实用;example:超短例句(可省)。grammar:对话中提到的语法现象,explain 用中文一两句解释。"}]},
         contents:[{role:"user", parts:[{text:"对话片段:\n"+chunk}]}],
         generationConfig:{responseMimeType:"application/json", responseSchema:schema, temperature:0.2}
@@ -820,7 +894,7 @@ const textChat = {
     try{
       const turns = day().turns.slice(-24);
       const contents = turns.map(t=>({role: t.who==="me"?"user":"model", parts:[{text:t.text}]}));
-      const reply = await restCall(TEXT_CHAIN, {
+      const reply = await restCall(effectiveChain(TEXT_CHAIN), {
         systemInstruction:{parts:[{text: systemPrompt("text")}]},
         contents,
         generationConfig:{temperature:0.85}
@@ -828,6 +902,10 @@ const textChat = {
       ui.updateMsg(tip, reply); ui.solidify(tip);
       day().turns.push({who:"anna", text:reply, ts:Date.now()}); save();
       extractor.feed("老师:"+reply);
+      if(store.autoSpeakText){
+        const ru = (reply.match(/[Ѐ-ӿ][Ѐ-ӿ́̀-]*/g)||[]).join(" ");
+        if(ru) speakRu(ru);
+      }
     }catch(e){
       tip.remove();
       if(e.badKey) toast("API Key 无效,去设置里检查一下");
@@ -848,7 +926,7 @@ async function makeSummary(dateStr, silent){
       weak_points:{type:"ARRAY", items:{type:"STRING"}}, next_focus:{type:"STRING"}
     }, required:["summary","new_words","weak_points","next_focus"]};
     const transcript = d.turns.map(t=>(t.who==="me"?"学生:":"老师:")+t.text).join("\n").slice(-9000);
-    const txt = await restCall(UTIL_CHAIN, {
+    const txt = await restCall(effectiveChain(UTIL_CHAIN), {
       systemInstruction:{parts:[{text:"你是俄语学习记录助手。根据当天师生对话,生成中文学习小结。summary:2-4句,聊了什么+学了什么;new_words:当天接触的俄语词(带重音符号);weak_points:学生表现出的薄弱点;next_focus:下次建议聚焦的一句话。"}]},
       contents:[{role:"user", parts:[{text:`日期:${dateStr}\n对话记录:\n${transcript}`}]}],
       generationConfig:{responseMimeType:"application/json", responseSchema:schema, temperature:0.3}
@@ -865,7 +943,8 @@ function pickRuVoice(){
   ruVoice = vs.find(v=>/^ru/i.test(v.lang) && /milena/i.test(v.name)) || vs.find(v=>/^ru/i.test(v.lang)) || null;
 }
 if("speechSynthesis" in window){ pickRuVoice(); speechSynthesis.onvoiceschanged = pickRuVoice; }
-function speakRu(text, rate=0.85){
+function speakRu(text, rate){
+  if(rate==null) rate = store.speechRate || 0.9;
   if(!("speechSynthesis" in window)) return;
   const clean = text.normalize("NFD").replace(/[̀-ͯ]/g,"");
   speechSynthesis.cancel();
@@ -1105,25 +1184,42 @@ $("#chat").addEventListener("click", e => {
 $("#settingsBtn").addEventListener("click", () => {
   $("#keyIn").value = store.apiKey;
   $("#voiceSel").value = store.voice;
+  $("#modelSel").value = store.textModel || "auto";
+  $("#customModelIn").value = store.customModel || "";
+  $("#levelSel").value = store.level || "A0";
+  $("#topicsIn").value = store.topics || "";
+  $("#rateIn").value = store.speechRate || 0.9;
+  $("#rateVal").textContent = (store.speechRate || 0.9).toFixed(2);
+  $("#autoSpeakChk").checked = !!store.autoSpeakText;
+  $("#testStat").textContent = ""; $("#testStat").className = "";
   ui.refreshUsage();
   $("#settingsSheet").classList.add("show");
 });
 document.querySelectorAll(".overlay").forEach(o => o.addEventListener("click", e => { if(e.target===o) o.classList.remove("show"); }));
+$("#rateIn").addEventListener("input", e => { $("#rateVal").textContent = (+e.target.value).toFixed(2); });
 $("#saveSetBtn").addEventListener("click", () => {
   store.apiKey = $("#keyIn").value.trim();
   store.voice = $("#voiceSel").value;
+  store.textModel = $("#modelSel").value;
+  store.customModel = $("#customModelIn").value.trim();
+  store.level = $("#levelSel").value;
+  store.topics = $("#topicsIn").value.trim();
+  store.speechRate = +$("#rateIn").value;
+  store.autoSpeakText = $("#autoSpeakChk").checked;
   save();
   $("#settingsSheet").classList.remove("show");
   toast("已保存 ✓");
 });
 $("#testBtn").addEventListener("click", async () => {
   const k = $("#keyIn").value.trim();
-  if(!k){ toast("先粘贴 API Key"); return; }
-  $("#testBtn").textContent = "测试中…";
+  const stat = $("#testStat");
+  if(!k){ stat.textContent = "先粘贴 API Key"; stat.className = "bad"; return; }
+  $("#testBtn").textContent = "测试中…"; stat.textContent = ""; stat.className = "";
   try{
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k)}&pageSize=1`);
-    toast(r.ok ? "连接成功 ✓ Key 可用" : "Key 无效(HTTP "+r.status+")");
-  }catch(e){ toast("网络不通,稍后再试"); }
+    if(r.ok){ stat.textContent = "✓ 连接成功"; stat.className = "ok"; }
+    else{ stat.textContent = "✗ Key 无效(" + r.status + ")"; stat.className = "bad"; }
+  }catch(e){ stat.textContent = "✗ 网络不通"; stat.className = "bad"; }
   $("#testBtn").textContent = "测试连接";
 });
 $("#obGo").addEventListener("click", () => {
