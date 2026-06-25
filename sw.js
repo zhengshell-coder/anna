@@ -1,5 +1,5 @@
 /* 安娜俄语老师 - Service Worker:缓存应用外壳,离线也能打开(AI 功能需联网) */
-const VERSION = "anna-v2";
+const VERSION = "anna-v3";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-180.png"];
 
 self.addEventListener("install", e => {
